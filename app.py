@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 @st.cache_data
 def load_data():
     # Use relative paths (works both locally & on GitHub/Streamlit Cloud)
-    stock_df = pd.read_csv("data/merged_output.csv", parse_dates=["Date"])
+    stock_df = pd.read_csv("data/merged_output_17_08_2025.csv", parse_dates=["Date"])
     news_df = pd.read_csv("data/combined_output.csv", parse_dates=["date"])
     
     # Replace NaN with 0
