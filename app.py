@@ -8,13 +8,14 @@ import plotly.graph_objects as go
 # =======================
 @st.cache_data
 def load_data():
-    stock_df = pd.read_csv(r"D:\Stocks\merged_output_17_08_2025.csv", parse_dates=["Date"])
-    news_df = pd.read_csv(r"D:\news_paper\github_web_app\combined_output.csv", parse_dates=["date"])
+    # Use relative paths (works both locally & on GitHub/Streamlit Cloud)
+    stock_df = pd.read_csv("data/merged_output.csv", parse_dates=["Date"])
+    news_df = pd.read_csv("data/combined_output.csv", parse_dates=["date"])
+    
     # Replace NaN with 0
     stock_df = stock_df.fillna(0)
     news_df = news_df.fillna(0)
     return stock_df, news_df
-
 stock_df, news_df = load_data()
 
 # =======================
