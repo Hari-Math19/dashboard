@@ -8,14 +8,13 @@ import plotly.graph_objects as go
 # =======================
 @st.cache_data
 def load_data():
-    # Use relative paths (works both locally & on GitHub/Streamlit Cloud)
-    stock_df = pd.read_csv("data/merged_output_17_08_2025.csv", parse_dates=["Date"])
-    news_df = pd.read_csv("data/combined_output.csv", parse_dates=["date"])
-    
+    stock_df = pd.read_csv(r"data\merged_output_17_08_2025.csv", parse_dates=["Date"])
+    news_df = pd.read_csv(r"data\combined_output.csv", parse_dates=["date"])
     # Replace NaN with 0
     stock_df = stock_df.fillna(0)
     news_df = news_df.fillna(0)
     return stock_df, news_df
+
 stock_df, news_df = load_data()
 
 # =======================
@@ -69,7 +68,7 @@ def analyze_and_plot(df, group_col, title, rename_col=None):
 st.set_page_config(layout="wide")
 st.title("📊 Stock & News Analysis Dashboard")
 st.markdown("### Bringing together stock data 📈 and market news 📰 for smarter decisions.")
-st.markdown("### Based on Newspapers and articles from various websites summarized by AI")
+
 tab1, tab2 = st.tabs(["📊 Dashboard", "📑 News Report"])
 
 # -----------------------
