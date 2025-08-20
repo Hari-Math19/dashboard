@@ -3,18 +3,21 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+from st_aggrid import AgGrid, GridOptionsBuilder,ColumnsAutoSizeMode
+
 # =======================
 # 📂 Load Data
 # =======================
 @st.cache_data
 def load_data():
-    stock_df = pd.read_csv(r"data\merged_output_17_08_2025.csv", parse_dates=["Date"])
-    news_df = pd.read_csv(r"data\combined_output.csv", parse_dates=["date"])
+    # Use relative paths (works both locally & on GitHub/Streamlit Cloud)
+    stock_df = pd.read_csv("data/merged_output_17_08_2025.csv", parse_dates=["Date"])
+    news_df = pd.read_csv("data/combined_output.csv", parse_dates=["date"])
+
     # Replace NaN with 0
     stock_df = stock_df.fillna(0)
     news_df = news_df.fillna(0)
     return stock_df, news_df
-
 stock_df, news_df = load_data()
 
 # =======================
@@ -38,6 +41,8 @@ def analyze_and_plot(df, group_col, title, rename_col=None):
         count_yes = (subset["future_growth"] == "yes").sum()
         total = subset["future_growth"].count()
         percentage_yes = (count_yes / total) * 100 if total > 0 else 0
+        percentage_yes = 100 if percentage_yes > 100 else percentage_yes#balaji
+
         growth_percent.append(percentage_yes)
 
         group_values.append(i)
@@ -50,14 +55,53 @@ def analyze_and_plot(df, group_col, title, rename_col=None):
         "growth_percent": growth_percent,
         col_name: group_values
     })
+    final_df = final_df.sort_values(by="avg_model_confidence_score", ascending=True)
+
+
 
     fig = px.bar(
         final_df,
-        x=col_name,
-        y=["avg_impact_score", "avg_senti_score", "growth_percent", "avg_model_confidence_score"],
+        y=col_name,
+        x=["avg_impact_score", "avg_senti_score", "growth_percent", "avg_model_confidence_score"],
+        orientation='h',
         barmode="group",
-        title=title
+        title=title,
+        height=700
     )
+    fig.update_layout(
+        legend=dict(
+            orientation="h",       # horizontal legend
+            yanchor="bottom",      # anchor to bottom
+            y=-0.2,                # position below the chart
+            xanchor="center",      # center horizontally
+            x=0.5                  # middle of the x-axis
+            ),
+            xaxis=dict(
+                showline=True,      # show x-axis line
+                linewidth=2,        # optional: thickness of the axis line
+                linecolor='black'   # optional: color of the axis line
+                ),
+            yaxis=dict(
+                showline=True,
+                linewidth=2,
+                linecolor='black'
+                )
+        )
+    fig.update_xaxes(
+        showticklabels=True,   # Show tick labels
+        ticks="outside",       # Show tick marks outside the axis
+        ticklen=5,             # Length of the tick marks
+        tickwidth=2,           # Width of the tick marks
+        tickcolor='black',      # Color of the tick marks
+        showgrid=True,         # Show grid lines on x-axis
+        gridcolor='lightgray', # Optional: color of grid lines
+        gridwidth=1            # Optional: thickness of grid lines
+        )
+    fig.update_yaxes(
+        showgrid=True,
+        gridcolor='lightgray',
+        gridwidth=1
+        )
 
     return final_df, fig
 
@@ -67,18 +111,65 @@ def analyze_and_plot(df, group_col, title, rename_col=None):
 # =======================
 st.set_page_config(layout="wide")
 st.title("📊 Stock & News Analysis Dashboard")
-st.markdown("### Bringing together stock data 📈 and market news 📰 for smarter decisions.")
+st.markdown("Bringing together stock data 📈 and market news 📰 for smarter decisions. Based on Newspapers and articles from various websites summarized by AI")
+# Inject CSS for wrapping & narrow S.No column
+st.markdown(
+     """
+     <style>
+     #stock-and-news-analysis-dashboard {    margin-top: -2%;font-size: 30px;}
+     h3 {font-size: 17px;margin-top: -10px;}
+     h2 {font-size: 17px;margin-top: -10px; margin-bottom: -12px;}
+     .stMainBlockContainer {margin-top: -1%;}
+     </style>
+     """,
+     unsafe_allow_html=True
+ )
+#.stElementContainer {margin-top: -2%;}
+
+
+
 
 tab1, tab2 = st.tabs(["📊 Dashboard", "📑 News Report"])
+
 
 # -----------------------
 # ✅ First Tab: Dashboard
 # -----------------------
 with tab1:
-    col_left, col_right = st.columns([1, 1])
+    # Candlestick chart below
+    st.subheader("📈 Candlestick Chart")
+    row1_c1_f1, row1_c1_f2,row1_c1_f3 = st.columns([1,1,1])
+    with row1_c1_f1:
+        nse_options = sorted(stock_df['NSE'].dropna().unique())
+        selected_nse = st.selectbox("Select NSE", nse_options)
+    with row1_c1_f2:
+        filtered_stock = stock_df[stock_df['NSE'] == selected_nse]
+        stock_names = filtered_stock['STOCK_NAME'].dropna().unique()
+        selected_stock = st.selectbox("Select Stock", stock_names)
+    #with row1_c1_f3:
 
-    # Left Panel
-    with col_left:
+    stock_data = filtered_stock[filtered_stock['STOCK_NAME'] == selected_stock].sort_values("Date")
+
+    row1_c1_c1, row1_c1_c2= st.columns([4,1])
+    with row1_c1_c1:
+        fig_candle = go.Figure(data=[go.Candlestick(
+            x=stock_data['Date'],
+            open=stock_data['Open'],
+            high=stock_data['High'],
+            low=stock_data['Low'],
+            close=stock_data['Close']
+            )])
+        fig_candle.update_layout(xaxis_title="Date", yaxis_title="Price", xaxis_rangeslider_visible=False)
+        st.plotly_chart(fig_candle, use_container_width=True)
+
+    #with row1_c1_c2:
+
+
+
+    row2_c1, row2_c2 = st.columns([1,1])
+    row3_c1, row3_c2 = st.columns([1,1])
+
+    with row2_c1:
         # Indian Market Overview first
         st.markdown("### 🌍 Indian Market Overview (Sector Group)")
         final_df_sector, fig_sector = analyze_and_plot(
@@ -89,28 +180,19 @@ with tab1:
         )
         st.plotly_chart(fig_sector, use_container_width=True)
 
-        # Candlestick chart below
-        st.markdown("### 📈 Candlestick Chart")
-        nse_options = sorted(stock_df['NSE'].dropna().unique())
-        selected_nse = st.selectbox("Select NSE", nse_options)
+    with row2_c2:
+        # Stock Relative below
+        st.markdown("### 📊 Stock Relative Analysis")
+        final_df_relative, fig_relative = analyze_and_plot(
+            news_df,
+            group_col="Stock Relative",
+            title="Scores by Stock Relative",
+            rename_col="Stock_Relative"
+        )
+        st.plotly_chart(fig_relative, use_container_width=True)
 
-        filtered_stock = stock_df[stock_df['NSE'] == selected_nse]
-        stock_names = filtered_stock['STOCK_NAME'].dropna().unique()
-        selected_stock = st.selectbox("Select Stock", stock_names)
-
-        stock_data = filtered_stock[filtered_stock['STOCK_NAME'] == selected_stock].sort_values("Date")
-
-        fig_candle = go.Figure(data=[go.Candlestick(
-            x=stock_data['Date'],
-            open=stock_data['Open'],
-            high=stock_data['High'],
-            low=stock_data['Low'],
-            close=stock_data['Close']
-        )])
-        fig_candle.update_layout(xaxis_title="Date", yaxis_title="Price", xaxis_rangeslider_visible=False)
-        st.plotly_chart(fig_candle, use_container_width=True)
     # Right Panel
-    with col_right:
+    with row3_c1:
         # NSE first
         st.markdown("### 📊 Scores by Nifty (NSE)")
         final_df_nse, fig_nse = analyze_and_plot(
@@ -121,15 +203,6 @@ with tab1:
         )
         st.plotly_chart(fig_nse, use_container_width=True)
 
-        # Stock Relative below
-        st.markdown("### 📊 Stock Relative Analysis")
-        final_df_relative, fig_relative = analyze_and_plot(
-            news_df,
-            group_col="Stock Relative",
-            title="Scores by Stock Relative",
-            rename_col="Stock_Relative"
-        )
-        st.plotly_chart(fig_relative, use_container_width=True)
 
 
 # -----------------------
@@ -149,44 +222,34 @@ with tab2:
     # ---------- Defaults you asked for ----------
     DEFAULT_IMPACT = 90
     DEFAULT_SENTIMENT = 90
-    DEFAULT_DATE_STR = "2025-08-16"          # yyyy-mm-dd
+    # DEFAULT_DATE_STR = news_df["date"].max()#"2025-08-16"          # yyyy-mm-dd
     DEFAULT_GROWTH = "Yes"
-    DEFAULT_TYPE = "commodity"
-    DEFAULT_NSE = "Nifty Energy"
-    DEFAULT_STOCK_REL = "Energy & Resources"
+    # DEFAULT_TYPE = "commodity"
+    # DEFAULT_NSE = "Nifty Energy"
+    # DEFAULT_STOCK_REL = "Energy & Resources"
     # --------------------------------------------
 
     # --- User inputs for thresholds (0–100 for both, we’ll auto-scale data if needed) ---
-    col1, col2 = st.columns(2)
-    with col1:
-        impact_threshold = st.number_input(
-            "Enter Impact Score Threshold (less than, 0–100)",
-            min_value=0, max_value=100, value=DEFAULT_IMPACT
-        )
-    with col2:
-        sentiment_threshold = st.number_input(
-            "Enter Sentiment Score Threshold (less than, 0–100)",
-            min_value=0, max_value=100, value=DEFAULT_SENTIMENT, step=1
-        )
+
 
     # --- Apply numeric filters first (auto-scale series to 0–100 if needed) ---
     filtered_news = news_df.copy()
 
-    if "impact_score" in filtered_news.columns:
-        imp = pd.to_numeric(filtered_news["impact_score"], errors="coerce")
-        imp_max = imp.max(skipna=True)
-        if pd.notna(imp_max) and imp_max <= 1:
-            imp = imp * 100
-        filtered_news = filtered_news[imp < impact_threshold]
+    # if "impact_score" in filtered_news.columns:
+    #     imp = pd.to_numeric(filtered_news["impact_score"], errors="coerce")
+    #     imp_max = imp.max(skipna=True)
+    #     if pd.notna(imp_max) and imp_max <= 1:
+    #         imp = imp * 100
+    #     filtered_news = filtered_news[imp < impact_threshold]
 
-    if "sentiment_score" in filtered_news.columns:
-        sen = pd.to_numeric(filtered_news["sentiment_score"], errors="coerce")
-        sen_max = sen.max(skipna=True)
-        if pd.notna(sen_max) and sen_max <= 1:
-            sen = sen * 100
-        filtered_news = filtered_news[sen < sentiment_threshold]
+    # if "sentiment_score" in filtered_news.columns:
+    #     sen = pd.to_numeric(filtered_news["sentiment_score"], errors="coerce")
+    #     sen_max = sen.max(skipna=True)
+    #     if pd.notna(sen_max) and sen_max <= 1:
+    #         sen = sen * 100
+    #     filtered_news = filtered_news[sen < sentiment_threshold]
 
-    st.subheader("Dropdown Filters")
+    # st.subheader("Dropdown Filters")
 
     # Helper: find default index in a list (case-insensitive), with "All" prepended
     def default_index(options_list, default_value):
@@ -200,59 +263,75 @@ with tab2:
     col_a, col_b, col_c, col_d, col_e, col_f = st.columns(6)
 
     # DATE
-    with col_a:
+    with col_f:
         if "date" in filtered_news.columns:
             # Ensure consistent string format yyyy-mm-dd
             date_series = pd.to_datetime(filtered_news["date"], errors="coerce")
             date_options = sorted(date_series.dropna().dt.strftime("%Y-%m-%d").unique().tolist())
         else:
             date_options = []
-        date_idx = default_index(date_options, DEFAULT_DATE_STR)
-        selected_date = st.selectbox("Select Date", ["All"] + date_options, index=min(date_idx, len(["All"] + date_options) - 1))
+        # date_idx = default_index(date_options, DEFAULT_DATE_STR)
+        selected_date = st.selectbox("Select Date", ["All"] + date_options, index=len(["All"] + date_options) - 1)
 
     temp_df = filtered_news.copy()
     if selected_date != "All" and "date" in temp_df.columns:
         temp_df = temp_df[pd.to_datetime(temp_df["date"], errors="coerce").dt.strftime("%Y-%m-%d") == selected_date]
 
-    # FUTURE GROWTH
-    with col_b:
-        growth_options = sorted(temp_df["future_growth"].dropna().unique().tolist()) if "future_growth" in temp_df.columns else []
-        growth_idx = default_index(growth_options, DEFAULT_GROWTH)
-        selected_growth = st.selectbox("Future Growth", ["All"] + growth_options, index=min(growth_idx, len(["All"] + growth_options) - 1))
-    if selected_growth != "All" and "future_growth" in temp_df.columns:
-        temp_df = temp_df[temp_df["future_growth"].str.strip().str.lower() == selected_growth.strip().lower()]
 
     # TYPE (Sector/Commodity)
-    with col_c:
+    with col_a:
         type_options = sorted(temp_df["type"].dropna().unique().tolist()) if "type" in temp_df.columns else []
-        type_idx = default_index(type_options, DEFAULT_TYPE)
-        selected_type = st.selectbox("Select Sector/Commodity", ["All"] + type_options, index=min(type_idx, len(["All"] + type_options) - 1))
+        # type_idx = default_index(type_options, DEFAULT_TYPE)
+        selected_type = st.selectbox("Select Sector/Commodity", ["All"] + type_options, index=0)#min(type_idx, len(["All"] + type_options) - 1)
     if selected_type != "All" and "type" in temp_df.columns:
         temp_df = temp_df[temp_df["type"].str.strip().str.lower() == selected_type.strip().lower()]
 
+
     # NSE
-    with col_d:
-        nse_options = sorted(temp_df["NSE"].dropna().unique().tolist()) if "NSE" in temp_df.columns else []
-        nse_idx = default_index(nse_options, DEFAULT_NSE)
-        selected_nse = st.selectbox("Select NSE", ["All"] + nse_options, index=min(nse_idx, len(["All"] + nse_options) - 1))
-    if selected_nse != "All" and "NSE" in temp_df.columns:
-        temp_df = temp_df[temp_df["NSE"] == selected_nse]
+    # with col_d:
+    #     nse_options = sorted(temp_df["NSE"].dropna().unique().tolist()) if "NSE" in temp_df.columns else []
+    #     nse_idx = default_index(nse_options, DEFAULT_NSE)
+    #     selected_nse = st.selectbox("Select NSE", ["All"] + nse_options, index=min(nse_idx, len(["All"] + nse_options) - 1))
+    # if selected_nse != "All" and "NSE" in temp_df.columns:
+    #     temp_df = temp_df[temp_df["NSE"] == selected_nse]
 
     # STOCK RELATIVE
-    with col_e:
+    with col_b:
         stock_options = sorted(temp_df["Stock Relative"].dropna().unique().tolist()) if "Stock Relative" in temp_df.columns else []
-        stock_idx = default_index(stock_options, DEFAULT_STOCK_REL)
-        selected_stock = st.selectbox("Select Stock Relative", ["All"] + stock_options, index=min(stock_idx, len(["All"] + stock_options) - 1))
+        # stock_idx = default_index(stock_options, DEFAULT_STOCK_REL)
+        selected_stock = st.selectbox("Select Stock Relative", ["All"] + stock_options, index=0)
     if selected_stock != "All" and "Stock Relative" in temp_df.columns:
         temp_df = temp_df[temp_df["Stock Relative"] == selected_stock]
 
     # SECTOR GROUP
-    with col_f:
-        sector_options = sorted(temp_df["Sector Group"].dropna().unique().tolist()) if "Sector Group" in temp_df.columns else []
-        # No explicit default for Sector Group requested; default to "All"
-        selected_sector = st.selectbox("Select Sector Group", ["All"] + sector_options)
-    if selected_sector != "All" and "Sector Group" in temp_df.columns:
-        temp_df = temp_df[temp_df["Sector Group"] == selected_sector]
+    # with col_b:
+    #     sector_options = sorted(temp_df["Sector Group"].dropna().unique().tolist()) if "Sector Group" in temp_df.columns else []
+    #     # No explicit default for Sector Group requested; default to "All"
+    #     selected_sector = st.selectbox("Select Sector Group", ["All"] + sector_options)
+    # if selected_sector != "All" and "Sector Group" in temp_df.columns:
+    #     temp_df = temp_df[temp_df["Sector Group"] == selected_sector]
+
+
+    # col1, col2,col3, col4 = st.columns(4)
+    with col_d:
+        impact_threshold = st.number_input(
+            "Impact Score Threshold",
+            min_value=0, max_value=100, value=DEFAULT_IMPACT
+        )
+    with col_e:
+        sentiment_threshold = st.number_input(
+            "Sentiment Score Threshold",
+            min_value=0, max_value=100, value=DEFAULT_SENTIMENT, step=1
+        )
+    # FUTURE GROWTH
+    with col_c:
+        growth_options = sorted(temp_df["future_growth"].dropna().unique().tolist()) if "future_growth" in temp_df.columns else []
+        growth_idx = default_index(growth_options, DEFAULT_GROWTH)
+        selected_growth = st.selectbox("Future Growth", ["All"] + growth_options, index=min(growth_idx, len(["All"] + growth_options) - 1))
+        if selected_growth != "All" and "future_growth" in temp_df.columns:
+            temp_df = temp_df[temp_df["future_growth"].str.strip().str.lower() == selected_growth.strip().lower()]
+
+
 
     # --- Normalize columns for display-only (Title-Case) ---
     temp_df_disp = temp_df.copy()
@@ -263,31 +342,49 @@ with tab2:
     if subset_cols:
         temp_df_disp = temp_df_disp.drop_duplicates(subset=subset_cols)
 
-    st.subheader("Filtered News Results")
 
-    if not temp_df_disp.empty and all(c in temp_df_disp.columns for c in ["Headline", "Summary"]):
-        results_df = temp_df_disp.reset_index(drop=True)[["Headline", "Summary"]]
+
+    # st.subheader("Filtered News Results")
+    col_names=["Headline", "Summary","Sector_Or_Commodity","Market_Sentiment","Sentiment_Score","Impact_Score","Confidence_Score","Stock_Name","Sector Group"]
+    if not temp_df_disp.empty and all(c in temp_df_disp.columns for c in col_names):
+        results_df = temp_df_disp.reset_index(drop=True)[col_names]
+        results_df = results_df.sort_values(by="Impact_Score", ascending=False)
         results_df.index = results_df.index + 1
-        results_df = results_df.reset_index().rename(columns={"index": "S.No"})
+#        results_df = results_df.reset_index().rename(columns={"index": "S.No"})
 
-        # Render via HTML to control wrapping & S.No width
-        # (st.dataframe truncates long text & wrapping is unreliable)
-        html_table = results_df.to_html(escape=False, index=False)
+        gb = GridOptionsBuilder.from_dataframe(results_df)
+        # gb.configure_default_column(resizable=True)
+        # gb.configure_column(field="Headline",header_name="Headline", width=300, cellStyle={"white-space": "normal", "word-wrap": "break-word"})
+        first_two_columns = results_df.columns[:2]
+        gb.configure_column(first_two_columns[0], width=100)
+        gb.configure_column(first_two_columns[1],width=100,
+    cellStyle={"white-space": "normal", "word-wrap": "break-word"},
+    wrapText=True,
+    autoHeight=True
+)
+        gridOptions = gb.build()
+
+        AgGrid(results_df, gridOptions=gridOptions
+               # , columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW
+               )
+
+        # AgGrid(results_df,gridOptions=gridOptions,columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS)
 
         # Inject CSS for wrapping & narrow S.No column
-        st.markdown(
-            """
-            <style>
-              table { table-layout: fixed; width: 100%; }
-              th, td { white-space: normal !important; word-wrap: break-word !important; }
-              th:nth-child(1), td:nth-child(1) { width: 60px; }      /* S.No */
-              th:nth-child(2), td:nth-child(2) { width: 35%; }       /* Headline */
-              th:nth-child(3), td:nth-child(3) { width: 55%; }       /* Summary */
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-        st.markdown(html_table, unsafe_allow_html=True)
+        # st.markdown(
+        #     """
+        #     <style>
+        #       table { table-layout: fixed; width: 100%; }
+        #       th, td { white-space: normal !important; word-wrap: break-word !important; }
+        #       th:nth-child(1), td:nth-child(1) { width: 60px; }      /* S.No */
+        #       th:nth-child(2), td:nth-child(2) { width: 35%; }       /* Headline */
+        #       th:nth-child(3), td:nth-child(3) { width: 55%; }       /* Summary */
+        #     </style>
+        #     """,
+        #     unsafe_allow_html=True
+        # )
+        #st.markdown(html_table, unsafe_allow_html=True)
+        # components.html(html_code, height=700, scrolling=True)
 
         st.caption(f"Showing {len(results_df)} articles after filtering")
     else:
