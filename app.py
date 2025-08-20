@@ -11,8 +11,8 @@ from st_aggrid import AgGrid, GridOptionsBuilder,ColumnsAutoSizeMode
 @st.cache_data
 def load_data():
     # Use relative paths (works both locally & on GitHub/Streamlit Cloud)
-    stock_df = pd.read_csv("data/merged_output_17_08_2025.csv", parse_dates=["Date"])
-    news_df = pd.read_csv("data/combined_output.csv", parse_dates=["date"])
+    stock_df = pd.read_csv("./data/merged_output_17_08_2025.csv", parse_dates=["Date"])
+    news_df = pd.read_csv("./data/combined_output.csv", parse_dates=["date"])
 
     # Replace NaN with 0
     stock_df = stock_df.fillna(0)
