@@ -16,7 +16,8 @@ def load_data():
 
     # Replace NaN with 0
     stock_df = stock_df.fillna(0)
-    news_df = news_df.fillna(0)
+    news_df['stock_name'] = news_df['stock_name'].fillna('Nan')
+    news_df['stock_name'] = news_df['stock_name'].fillna('Nan')
     return stock_df, news_df
 stock_df, news_df = load_data()
 
