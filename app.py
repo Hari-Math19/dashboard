@@ -131,196 +131,167 @@ tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "📑 News Report", "🗃️ Data 
 # ✅ First Tab: Dashboard
 # -----------------------
 with tab1:
-    end_date = dt.datetime.today()
-    start_date = end_date - dt.timedelta(days=365)
+st.set_page_config(layout="wide")  # ✅ Wide mode (no scrolling)
+
+# -----------------------------
+# Helper function: Technical Dashboard
+# -----------------------------
+def stock_dashboard(ticker, start, end):
+    data = yf.download(ticker, start=start, end=end, group_by="column", auto_adjust=False)
+
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
+
+    if data.empty:
+        fig = go.Figure()
+        fig.update_layout(title=f"No data for {ticker}")
+        return fig, "HOLD ⏸️"
 
     # -----------------------------
-    # Helper function: Technical Dashboard
+    # Fibonacci (last 10 days)
     # -----------------------------
-    def stock_dashboard(ticker, start=start_date, end=end_date):
-        data = yf.download(ticker, start=start, end=end, group_by="column", auto_adjust=False)
+    fib_data = data.tail(10)
+    high, low = fib_data['High'].max(), fib_data['Low'].min()
+    diff = high - low if pd.notna(high) and pd.notna(low) else 0
+    levels = {
+        '0.0%': high if pd.notna(high) else 0,
+        '23.6%': (high - 0.236 * diff) if diff else 0,
+        '38.2%': (high - 0.382 * diff) if diff else 0,
+        '50.0%': (high - 0.5 * diff) if diff else 0,
+        '61.8%': (high - 0.618 * diff) if diff else 0,
+        '100.0%': low if pd.notna(low) else 0
+    }
 
-        # Flatten MultiIndex if needed
-        if isinstance(data.columns, pd.MultiIndex):
-            data.columns = data.columns.get_level_values(0)
+    # -----------------------------
+    # MACD (kept for recommendation only)
+    # -----------------------------
+    exp1 = data['Close'].ewm(span=12, adjust=False).mean()
+    exp2 = data['Close'].ewm(span=26, adjust=False).mean()
+    macd = exp1 - exp2
+    signal = macd.ewm(span=9, adjust=False).mean()
 
-        if data.empty:
-            fig = go.Figure()
-            fig.update_layout(title=f"No data for {ticker}")
-            return fig, "HOLD ⏸️"
+    # RSI
+    delta = data['Close'].diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+    avg_gain = gain.rolling(14).mean()
+    avg_loss = loss.rolling(14).mean()
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
 
-        # -----------------------------
-        # Fibonacci Levels (last 10 days)
-        # -----------------------------
-        fib_data = data.tail(10)  # last 10 days
-        high, low = fib_data['High'].max(), fib_data['Low'].min()
-        diff = high - low if pd.notna(high) and pd.notna(low) else 0
-        levels = {
-            '0.0%': high if pd.notna(high) else 0,
-            '23.6%': (high - 0.236 * diff) if diff else 0,
-            '38.2%': (high - 0.382 * diff) if diff else 0,
-            '50.0%': (high - 0.5 * diff) if diff else 0,
-            '61.8%': (high - 0.618 * diff) if diff else 0,
-            '100.0%': low if pd.notna(low) else 0
-        }
-
-        # -----------------------------
-        # MACD
-        # -----------------------------
-        exp1 = data['Close'].ewm(span=12, adjust=False).mean()
-        exp2 = data['Close'].ewm(span=26, adjust=False).mean()
-        macd = exp1 - exp2
-        signal = macd.ewm(span=9, adjust=False).mean()
-
-        # -----------------------------
-        # RSI (simple rolling)
-        # -----------------------------
-        delta = data['Close'].diff()
-        gain = delta.where(delta > 0, 0)
-        loss = -delta.where(delta < 0, 0)
-        avg_gain = gain.rolling(14).mean()
-        avg_loss = loss.rolling(14).mean()
-        rs = avg_gain / avg_loss
-        rsi = 100 - (100 / (1 + rs))
-
-        # -----------------------------
-        # Buy/Sell signals
-        # -----------------------------
-        buy_signals, sell_signals = [], []
-        for i in range(1, len(data)):
-            if macd.iloc[i] > signal.iloc[i] and macd.iloc[i-1] <= signal.iloc[i-1] and rsi.iloc[i] < 70:
-                buy_signals.append((data.index[i], data['Close'].iloc[i]))
-            elif macd.iloc[i] < signal.iloc[i] and macd.iloc[i-1] >= signal.iloc[i-1] and rsi.iloc[i] > 30:
-                sell_signals.append((data.index[i], data['Close'].iloc[i]))
-
-        # -----------------------------
-        # Plotly Chart
-        # -----------------------------
-        fig = make_subplots(
-            rows=3, cols=1,
-            shared_xaxes=True,
-            vertical_spacing=0.05,
-            row_heights=[0.6, 0.2, 0.2],
-            subplot_titles=(f"{ticker} Price with Fibonacci Levels", "MACD", "RSI")
-        )
-
-        # Fibonacci shading for last 10 days
-        fib_colors = ["rgba(255,87,51,0.2)", "rgba(255,195,0,0.2)", "rgba(218,247,166,0.2)",
-                      "rgba(51,255,189,0.2)", "rgba(51,128,255,0.2)"]
-        fib_names = ['0.0%', '23.6%', '38.2%', '50.0%', '61.8%', '100.0%']
-        fib_dates = fib_data.index
-
-        if len(fib_dates) > 0 and diff:
-            for i in range(len(fib_names)-1):
-                fig.add_trace(go.Scatter(
-                    x=list(fib_dates) + list(fib_dates[::-1]),
-                    y=[levels[fib_names[i]]]*len(fib_dates) + [levels[fib_names[i+1]]]*len(fib_dates),
-                    fill='toself',
-                    fillcolor=fib_colors[i % len(fib_colors)],
-                    line=dict(color='rgba(0,0,0,0)'),
-                    showlegend=False,
-                    hoverinfo='skip'
-                ), row=1, col=1)
-
-        # Candlestick (on top of shaded area)
-        fig.add_trace(go.Candlestick(
-            x=data.index,
-            open=data['Open'], high=data['High'],
-            low=data['Low'], close=data['Close'],
-            name="Candlesticks",
-            increasing_line_color="limegreen",
-            decreasing_line_color="red"
-        ), row=1, col=1)
-
-        # Optional: add horizontal lines for Fibonacci reference
-        for name, price in levels.items():
-            if price:
-                fig.add_hline(
-                    y=price,
-                    line=dict(color='white', dash="dot", width=1),
-                    annotation_text=f"{name} {price:.2f}",
-                    annotation_position="right",
-                    annotation_font=dict(color='white', size=10),
-                    row=1, col=1
-                )
-
-        # Buy/Sell signals
-        if buy_signals:
-            fig.add_trace(go.Scatter(
-                x=[d for d, _ in buy_signals],
-                y=[p for _, p in buy_signals],
-                mode="markers", name="Buy Signal",
-                marker=dict(symbol="triangle-up", color="lime", size=12, line=dict(width=1, color="black"))
-            ), row=1, col=1)
-        if sell_signals:
-            fig.add_trace(go.Scatter(
-                x=[d for d, _ in sell_signals],
-                y=[p for _, p in sell_signals],
-                mode="markers", name="Sell Signal",
-                marker=dict(symbol="triangle-down", color="crimson", size=12, line=dict(width=1, color="black"))
-            ), row=1, col=1)
-
-        # MACD
-        fig.add_trace(go.Scatter(x=data.index, y=macd, mode="lines", name="MACD", line=dict(color="cyan", width=2)), row=2, col=1)
-        fig.add_trace(go.Scatter(x=data.index, y=signal, mode="lines", name="Signal", line=dict(color="orange", width=2)), row=2, col=1)
-
-        # RSI
-        fig.add_trace(go.Scatter(x=data.index, y=rsi, mode="lines", name="RSI", line=dict(color="violet", width=2)), row=3, col=1)
-        fig.add_hline(y=70, line=dict(color="red", dash="dot"), row=3, col=1)
-        fig.add_hline(y=30, line=dict(color="limegreen", dash="dot"), row=3, col=1)
-
-        fig.update_layout(
-            template="plotly_dark",
-            height=900,
-            autosize=True,
-            xaxis_rangeslider_visible=False,
-            margin=dict(l=50, r=50, t=80, b=50),
-            title=dict(text=f"{ticker} Technical Analysis Dashboard", font=dict(size=22, color="aqua")),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-        )
-
-        # Recommendation
-        latest_macd, latest_signal, latest_rsi = macd.iloc[-1], signal.iloc[-1], rsi.iloc[-1]
-        if latest_macd > latest_signal and latest_rsi < 70:
-            recommendation = "BUY ✅"
-        elif latest_macd < latest_signal and latest_rsi > 30:
-            recommendation = "SELL "
-        else:
-            recommendation = "HOLD ⏸️"
-
-        return fig, recommendation
-
-    st.markdown("---")
-
-    # Input Section
-    st.subheader("🔍 Select Stock(s)")
-    stocks = st.text_input(
-        "Enter stock symbols (comma separated, NSE/BSE tickers):",
-        "ITC.NS, INFY.NS, RELIANCE.NS"
+    # -----------------------------
+    # Plotly Chart (2 rows: Candles + RSI)
+    # -----------------------------
+    fig = make_subplots(
+        rows=2, cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.03,
+        row_heights=[0.75, 0.25],
+        subplot_titles=(f"{ticker} Candlestick + Fibonacci", "RSI")
     )
-    stock_list = [s.strip() for s in stocks.split(",") if s.strip()]
-    selected_stock_dash = st.selectbox("Choose a stock to analyze", stock_list) if stock_list else None
-    st.markdown("### ")
 
-    # Dashboard Section
-    if selected_stock_dash:
-        fig_dash, reco = stock_dashboard(selected_stock_dash)
-        st.plotly_chart(fig_dash, use_container_width=True)
+    # Fibonacci shading
+    fib_colors = ["rgba(255,87,51,0.2)", "rgba(255,195,0,0.2)", "rgba(218,247,166,0.2)",
+                  "rgba(51,255,189,0.2)", "rgba(51,128,255,0.2)"]
+    fib_names = ['0.0%', '23.6%', '38.2%', '50.0%', '61.8%', '100.0%']
+    fib_dates = fib_data.index
 
-        # Recommendation Section
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.markdown(
-                f"""
-                <div style="padding:15px; border-radius:10px; 
-                            background-color:#1E1E1E; text-align:center; 
-                            border: 1px solid #444;">
-                    <h3 style="color:aqua;">📊 Recommendation</h3>
-                    <h2 style="color:lime;">{reco}</h2>
-                </div>
-                """,
-                unsafe_allow_html=True
+    if len(fib_dates) > 0 and diff:
+        for i in range(len(fib_names)-1):
+            fig.add_trace(go.Scatter(
+                x=list(fib_dates) + list(fib_dates[::-1]),
+                y=[levels[fib_names[i]]]*len(fib_dates) + [levels[fib_names[i+1]]]*len(fib_dates),
+                fill='toself',
+                fillcolor=fib_colors[i % len(fib_colors)],
+                line=dict(color='rgba(0,0,0,0)'),
+                showlegend=False,
+                hoverinfo='skip'
+            ), row=1, col=1)
+
+    # Candlestick
+    fig.add_trace(go.Candlestick(
+        x=data.index,
+        open=data['Open'], high=data['High'],
+        low=data['Low'], close=data['Close'],
+        name="Candlestick",
+        increasing_line_color="limegreen",
+        decreasing_line_color="red"
+    ), row=1, col=1)
+
+    # Fibonacci horizontal lines
+    for name, price in levels.items():
+        if price:
+            fig.add_hline(
+                y=price,
+                line=dict(color='white', dash="dot", width=1),
+                annotation_text=f"{name} {price:.2f}",
+                annotation_position="right",
+                annotation_font=dict(color='white', size=9),
+                row=1, col=1
             )
+
+    # RSI
+    fig.add_trace(go.Scatter(x=data.index, y=rsi, mode="lines", name="RSI",
+                             line=dict(color="violet", width=2)), row=2, col=1)
+    fig.add_hline(y=70, line=dict(color="red", dash="dot"), row=2, col=1)
+    fig.add_hline(y=30, line=dict(color="limegreen", dash="dot"), row=2, col=1)
+
+    # Layout
+    fig.update_layout(
+        template="plotly_dark",
+        height=650,  # ✅ more compact
+        margin=dict(l=30, r=30, t=60, b=40),
+        xaxis_rangeslider_visible=False,
+        title=dict(text=f"{ticker} Technical Dashboard", font=dict(size=20, color="aqua")),
+        legend=dict(orientation="h", yanchor="top", y=-0.12, xanchor="center", x=0.5)
+    )
+
+    # Zoom to last 6 weeks
+    if len(data) > 30:
+        fig.update_xaxes(range=[data.index[-30], data.index[-1]])
+
+    # Recommendation
+    latest_macd, latest_signal, latest_rsi = macd.iloc[-1], signal.iloc[-1], rsi.iloc[-1]
+    if latest_macd > latest_signal and latest_rsi < 70:
+        recommendation = "BUY ✅"
+    elif latest_macd < latest_signal and latest_rsi > 30:
+        recommendation = "SELL"
+    else:
+        recommendation = "HOLD ⏸️"
+
+    return fig, recommendation
+
+
+# -----------------------------
+# Streamlit UI
+# -----------------------------
+end_date = dt.datetime.today()
+start_date = end_date - dt.timedelta(days=365)
+
+st.subheader("🔍 Stock Analysis Dashboard")
+
+stocks = st.text_input("Enter stock symbols (comma separated):", "ITC.NS, INFY.NS, GAIL.NS, RELIANCE.NS, TMB.NS, HDFCBANK.NS, TCS.NS, HINDUNILVR.NS, ASIANPAINT.NS, SOUTHBANK.NS, TATAMOTORS.NS")
+stock_list = [s.strip() for s in stocks.split(",") if s.strip()]
+selected_stock_dash = st.selectbox("Choose a stock to analyze", stock_list) if stock_list else None
+
+if selected_stock_dash:
+    fig_dash, reco = stock_dashboard(selected_stock_dash, start_date, end_date)
+
+    col_left, col_right = st.columns([4, 1])  # ✅ Chart wide, reco compact
+    with col_left:
+        st.plotly_chart(fig_dash, use_container_width=True)
+    with col_right:
+        st.markdown(
+            f"""
+            <div style="padding:15px; border-radius:10px; 
+                        background-color:#1E1E1E; text-align:center; 
+                        border: 1px solid #444; margin-top:50px;">
+                <h3 style="color:aqua;">📊 Recommendation</h3>
+                <h2 style="color:lime;">{reco}</h2>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
 # -----------------------
 # ✅ Second Tab: News Report
