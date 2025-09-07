@@ -23,8 +23,8 @@ def load_data():
     news_df = pd.read_csv(
     "./data/combined_output.csv",
     parse_dates=["date"],
-    encoding="utf-8",        # default, may fail
-    on_bad_lines="skip"      # skip problematic rows
+    encoding="latin1",       # fallback for non-UTF-8 files
+    on_bad_lines="skip"
 )
 
     # Replace NaN with 0 / defaults
