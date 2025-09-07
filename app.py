@@ -20,7 +20,12 @@ st.set_page_config(layout="wide", page_title="Stock & News Analysis Dashboard", 
 def load_data():
     # Use relative paths (works both locally & on GitHub/Streamlit Cloud)
     stock_df = pd.read_csv("./data/merged_output_17_08_2025.csv", parse_dates=["Date"])
-    news_df = pd.read_csv("./data/combined_output.csv", parse_dates=["date"])
+    news_df = pd.read_csv(
+    "./data/combined_output.csv",
+    parse_dates=["date"],
+    encoding="utf-8",        # default, may fail
+    on_bad_lines="skip"      # skip problematic rows
+)
 
     # Replace NaN with 0 / defaults
     stock_df = stock_df.fillna(0)
