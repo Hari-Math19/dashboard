@@ -303,29 +303,29 @@ with tab1:
 # -----------------------
 with tab2:
     # Candlestick chart below
-    st.subheader("📈 Candlestick Chart")
-    row1_c1_f1, row1_c1_f2, row1_c1_f3 = st.columns([1, 1, 1])
-    with row1_c1_f1:
-        nse_options = sorted(stock_df['NSE'].dropna().unique())
-        selected_nse_tab2 = st.selectbox("Select NSE", nse_options)
-    with row1_c1_f2:
-        filtered_stock = stock_df[stock_df['NSE'] == selected_nse_tab2]
-        stock_names = filtered_stock['STOCK_NAME'].dropna().unique()
-        selected_stock_tab2 = st.selectbox("Select Stock", stock_names)
+    # st.subheader("📈 Candlestick Chart")
+    # row1_c1_f1, row1_c1_f2, row1_c1_f3 = st.columns([1, 1, 1])
+    # with row1_c1_f1:
+    #     nse_options = sorted(stock_df['NSE'].dropna().unique())
+    #     selected_nse_tab2 = st.selectbox("Select NSE", nse_options)
+    # with row1_c1_f2:
+    #     filtered_stock = stock_df[stock_df['NSE'] == selected_nse_tab2]
+    #     stock_names = filtered_stock['STOCK_NAME'].dropna().unique()
+    #     selected_stock_tab2 = st.selectbox("Select Stock", stock_names)
 
-    stock_data = filtered_stock[filtered_stock['STOCK_NAME'] == selected_stock_tab2].sort_values("Date")
+    # stock_data = filtered_stock[filtered_stock['STOCK_NAME'] == selected_stock_tab2].sort_values("Date")
 
-    row1_c1_c1, row1_c1_c2 = st.columns([4, 1])
-    with row1_c1_c1:
-        fig_candle = go.Figure(data=[go.Candlestick(
-            x=stock_data['Date'],
-            open=stock_data['Open'],
-            high=stock_data['High'],
-            low=stock_data['Low'],
-            close=stock_data['Close']
-        )])
-        fig_candle.update_layout(xaxis_title="Date", yaxis_title="Price", xaxis_rangeslider_visible=False)
-        st.plotly_chart(fig_candle, use_container_width=True)
+    # row1_c1_c1, row1_c1_c2 = st.columns([4, 1])
+    # with row1_c1_c1:
+    #     fig_candle = go.Figure(data=[go.Candlestick(
+    #         x=stock_data['Date'],
+    #         open=stock_data['Open'],
+    #         high=stock_data['High'],
+    #         low=stock_data['Low'],
+    #         close=stock_data['Close']
+    #     )])
+    #     fig_candle.update_layout(xaxis_title="Date", yaxis_title="Price", xaxis_rangeslider_visible=False)
+    #     st.plotly_chart(fig_candle, use_container_width=True)
 
     row2_c1, row2_c2 = st.columns([1, 1])
     row3_c1, row3_c2 = st.columns([1, 1])
