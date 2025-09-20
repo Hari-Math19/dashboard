@@ -19,7 +19,7 @@ st.set_page_config(layout="wide", page_title="Stock & News Analysis Dashboard", 
 @st.cache_data
 def load_data():
     # Use relative paths (works both locally & on GitHub/Streamlit Cloud)
-    stock_df = pd.read_csv("./data/merged_output_17_08_2025.csv", parse_dates=["Date"])
+    #stock_df = pd.read_csv("./data/merged_output_17_08_2025.csv", parse_dates=["Date"])
     news_df = pd.read_csv(
     "./data/combined_output.csv",
     parse_dates=["date"],
@@ -28,12 +28,13 @@ def load_data():
 )
 
     # Replace NaN with 0 / defaults
-    stock_df = stock_df.fillna(0)
+    #stock_df = stock_df.fillna(0)
     news_df['stock_name'] = news_df.get('stock_name', pd.Series(dtype="object")).fillna('Nan')
     news_df = news_df.fillna(0)
-    return stock_df, news_df
+    return news_df
 
-stock_df, news_df = load_data()
+#stock_df, news_df = load_data() #uncomment if we have ./data/merged_output_17_08_2025.csv data
+news_df = load_data()
 
 # =======================
 # 📊 Aggregation + Plot Helper
